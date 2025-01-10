@@ -1,0 +1,126 @@
+My vue app as following, please check it
+
+App.Vue:
+<template>
+  <v-app>
+    <router-view />
+  </v-app>
+</template>
+
+<script>
+export default {
+  name: "App",
+};
+</script>
+
+<style>
+body {
+  margin: 0;
+  font-family: 'Lato:100,300,400,700,900';
+}
+</style>
+
+main.js:
+import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router'
+
+// Vuefity imports
+import 'vuetify/styles'
+import { createVuetify } from 'vuetify/lib/framework.mjs'
+import * as components from 'vuetify/components'
+import * as directives from 'vuetify/directives'
+
+// import MDI icons
+import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
+
+
+const vuetify = createVuetify({
+    icons: {
+        defaultSet: 'mdi',
+        aliases,
+        sets: {
+            mdi,
+        }
+    },
+    components,
+    directives,
+});
+
+const app = createApp(App);
+app.use(vuetify);
+app.use(router)
+app.mount('#app');
+
+router.js:
+import { createRouter, createWebHistory } from "vue-router";
+import LoginPage from './components/LoginPage.vue';
+import MainPage from "./components/MainPage.vue";
+import TopPage from "./components/TopPage.vue";
+import DBSearchView from "./components/DBSearchView.vue";
+import { isTokenExpired, validateTokenWithBackend, removeToken } from "./services/jwtService";
+
+
+const routes = [
+    {
+        path: '/',
+        name: 'Login',
+        component: LoginPage,
+    },
+    {
+        path: '/top',
+        name: 'Top',
+        component: TopPage,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/main',
+        name: 'Main',
+        component: MainPage,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/dbsearch',
+        name: 'DBSearch',
+        component: DBSearchView,
+        meta: { requiresAuth: true }
+    },
+];
+
+const router = createRouter({
+    history: createWebHistory(),
+    routes,
+});
+
+router.beforeEach(async (to, from, next) => {
+    const token = localStorage.getItem('authToken');
+    if (to.matched.some(record => record.meta.requiresAuth)) {
+        if (!token) {
+            next('/');
+        }
+        else if (isTokenExpired(token)) {
+            removeToken();
+            next('/');
+        }
+        else {
+            try {
+                const isValid = await validateTokenWithBackend(token);
+                if (isValid) {
+                    next();
+                } else {
+                    removeToken();
+                    next('/');
+                }
+            }
+            catch (error) {
+                console.error('Token valiation failed:', error)
+                removeToken();
+                next('/');
+            }
+        }
+    } else {
+        next();
+    }
+})
+
+export default router;
