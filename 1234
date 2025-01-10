@@ -1,126 +1,68 @@
-My vue app as following, please check it
+MainPage.vue
 
-App.Vue:
 <template>
-  <v-app>
-    <router-view />
-  </v-app>
+
+    <!--Header-->
+    <MenuBar />
+
+    <!--Main Layout-->
+    <v-container fluid>
+        <v-row>
+            <!--Sidebar-->
+            <v-col cols="12" md="2" class="sidebar">
+                <AppSidebar />
+            </v-col>
+
+            <!--Chat Screen-->
+            <v-col cols="12" md="4" class="chat-screen">
+                <SearchPanel @search-value-changed="handleSearchValueChanged" />
+            </v-col>
+
+            <!--Database View-->
+            <v-col cols="12" md="4" class="db-view" style="margin-left: 10px;">
+                <DatabaseView :receivedValue="searchValue" />
+            </v-col>
+        </v-row>
+    </v-container>
+
+
 </template>
 
 <script>
+import MenuBar from './MenuBar.vue';
+import AppSidebar from './AppSidebar.vue';
+import SearchPanel from './SearchPanel.vue'
+import DatabaseView from './DatabaseView.vue';
+
 export default {
-  name: "App",
+    name: 'App',
+    components: {
+        MenuBar,
+        AppSidebar,
+        SearchPanel,
+        DatabaseView,
+    },
+    data() {
+        return {
+            searchValue: ''
+        };
+    },
+    methods: {
+        handleSearchValueChanged(value) {
+            this.searchValue = value;
+        }
+    }
 };
+
 </script>
 
 <style>
-body {
-  margin: 0;
-  font-family: 'Lato:100,300,400,700,900';
+#app {
+    font-family: Avenir, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-align: center;
+    color: #2c3e50;
+    margin-top: 60px;
 }
 </style>
-
-main.js:
-import { createApp } from 'vue'
-import App from './App.vue'
-import router from './router'
-
-// Vuefity imports
-import 'vuetify/styles'
-import { createVuetify } from 'vuetify/lib/framework.mjs'
-import * as components from 'vuetify/components'
-import * as directives from 'vuetify/directives'
-
-// import MDI icons
-import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
-
-
-const vuetify = createVuetify({
-    icons: {
-        defaultSet: 'mdi',
-        aliases,
-        sets: {
-            mdi,
-        }
-    },
-    components,
-    directives,
-});
-
-const app = createApp(App);
-app.use(vuetify);
-app.use(router)
-app.mount('#app');
-
-router.js:
-import { createRouter, createWebHistory } from "vue-router";
-import LoginPage from './components/LoginPage.vue';
-import MainPage from "./components/MainPage.vue";
-import TopPage from "./components/TopPage.vue";
-import DBSearchView from "./components/DBSearchView.vue";
-import { isTokenExpired, validateTokenWithBackend, removeToken } from "./services/jwtService";
-
-
-const routes = [
-    {
-        path: '/',
-        name: 'Login',
-        component: LoginPage,
-    },
-    {
-        path: '/top',
-        name: 'Top',
-        component: TopPage,
-        meta: { requiresAuth: true }
-    },
-    {
-        path: '/main',
-        name: 'Main',
-        component: MainPage,
-        meta: { requiresAuth: true }
-    },
-    {
-        path: '/dbsearch',
-        name: 'DBSearch',
-        component: DBSearchView,
-        meta: { requiresAuth: true }
-    },
-];
-
-const router = createRouter({
-    history: createWebHistory(),
-    routes,
-});
-
-router.beforeEach(async (to, from, next) => {
-    const token = localStorage.getItem('authToken');
-    if (to.matched.some(record => record.meta.requiresAuth)) {
-        if (!token) {
-            next('/');
-        }
-        else if (isTokenExpired(token)) {
-            removeToken();
-            next('/');
-        }
-        else {
-            try {
-                const isValid = await validateTokenWithBackend(token);
-                if (isValid) {
-                    next();
-                } else {
-                    removeToken();
-                    next('/');
-                }
-            }
-            catch (error) {
-                console.error('Token valiation failed:', error)
-                removeToken();
-                next('/');
-            }
-        }
-    } else {
-        next();
-    }
-})
-
-export default router;
