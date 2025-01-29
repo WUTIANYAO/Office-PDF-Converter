@@ -1,88 +1,110 @@
-vue.config.js
+import xmltodict
+import json
+import sys
+import os
+from datetime import datetime
+import codecs
 
-const { defineConfig } = require('@vue/cli-service')
-const fs = require('fs')
+# Set up encoding to handle Japanese characters
+sys.stdout = codecs.getwriter('utf8')(sys.stdout.buffer)
 
-module.exports = defineConfig({
-transpileDependencies: true,
-devServer: {
-  // webSocketServer: false,
-  // https: {
-  //   key: fs.readFileSync('../certs/key.pem'),
-  //   cert: fs.readFileSync('../certs/cert.pem')
-  // },
-  host: '0.0.0.0',
-  port: 8888
+# Read the XML file and convert it to JSON
+xml_file_path = 'C:\\Users\\U735701\\Desktop\\Code\\xmltransfer\\JP2018000218A.xml'  # Modify to your input file path
+
+
+# Read the XML file
+with open(xml_file_path, 'r', encoding='utf-8') as xml_file:
+    xml_content = xml_file.read()
+    
+# Preprocess XML content: replace <br/> with newline character
+xml_content = xml_content.replace('<br/>', '\n')
+xml_content = xml_content.replace('\n\n', '\n')
+    
+# Convert XML to dictionary
+xml_dict = xmltodict.parse(xml_content, encoding='utf-8')
+    
+# Convert to JSON with proper Japanese character handling
+json_data = json.dumps(xml_dict, ensure_ascii=False, indent=2)
+    
+# Create output filename based on input XML name
+output_filename = f'{os.path.splitext(os.path.basename(xml_file_path))[0]}_FullVer.json'
+    
+# Write to JSON file
+with open(output_filename, 'w', encoding='utf-8') as json_file:
+    json_file.write(json_data)
+        
+print(f"Successfully converted XML to JSON. Output saved to: {output_filename}")
+    
+# Print some basic statistics about the conversion
+print("\nConversion Statistics:")
+print(f"- Input XML file size: {os.path.getsize(xml_file_path) / 1024:.2f} KB")
+print(f"- Output JSON file size: {os.path.getsize(output_filename) / 1024:.2f} KB")
+    
+# Filter JSON data
+input_file_path = output_filename  # Use the output FullVer.json file for filtering
+with open(input_file_path, 'r', encoding='utf-8') as json_file:
+    original_data = json.load(json_file)
+
+# Extract and modify the value of classification-ipc
+classification_ipc_raw = original_data["jp-official-gazette"]["bibliographic-data"]["classification-ipc"]["main-clsf"]
+classification_ipc = ' '.join(classification_ipc_raw.split()[:2])  # Extract the first two parts
+
+claims_data = original_data["jp-official-gazette"]["claims"]["claim"]
+if isinstance(claims_data, dict):
+    # process 1 data
+    claims_list = [claims_data]  
+elif isinstance(claims_data, list):
+    # process more data
+    claims_list = claims_data
+else:
+    claims_list = []  
+    
+# Extract inventor names
+inventor_data = original_data.get("jp-official-gazette", {}).get("bibliographic-data", {}).get("parties", {}).get("inventors", {}).get("inventor", [])
+inventor_names = []
+if isinstance(inventor_data, list):
+    inventor_names = [inventor.get("addressbook", {}).get("name", "") for inventor in inventor_data]
+elif isinstance(inventor_data, dict):
+    inventor_names = [inventor_data.get("addressbook", {}).get("name", "")]
+
+tech_problem = original_data.get("jp-official-gazette", {}).get("description", {}).get("summary-of-invention", {}).get("tech-problem", {}).get("p", {}).get("#text", "")
+advantageous_effects = original_data.get("jp-official-gazette", {}).get("description", {}).get("summary-of-invention", {}).get("advantageous-effects", {}).get("p", {}).get("#text", "")
+best_mode = original_data.get("jp-official-gazette", {}).get("description", {}).get("best-mode", {}).get("p", {}).get("#text", "")
+
+# Extract claims as a single string with no newlines
+claims_data = original_data.get("jp-official-gazette", {}).get("claims", {}).get("claim", [])
+claims_text = ""
+if isinstance(claims_data, list):
+    claims_text = ' '.join([claim.get("claim-text", "").replace('\n  ', '').strip() for claim in claims_data])
+elif isinstance(claims_data, dict):
+    claims_text = claims_data.get("claim-text", "").replace('\n  ', '').strip()
+
+
+filtered_data = {
+    "publication-doc-number": original_data["jp-official-gazette"]["bibliographic-data"]["publication-reference"]["document-id"]["doc-number"],
+    "publication-country": original_data["jp-official-gazette"]["bibliographic-data"]["publication-reference"]["document-id"]["country"],
+    "publication-kind": original_data["jp-official-gazette"]["bibliographic-data"]["publication-reference"]["document-id"]["kind"],
+    "publication-date": original_data["jp-official-gazette"]["bibliographic-data"]["publication-reference"]["document-id"]["date"],
+    "application-doc-number": original_data["jp-official-gazette"]["bibliographic-data"]["application-reference"]["document-id"]["doc-number"],
+    "application-date": original_data["jp-official-gazette"]["bibliographic-data"]["application-reference"]["document-id"]["date"],
+    "invention-title": original_data["jp-official-gazette"]["bibliographic-data"]["invention-title"],
+    "applicant-name": original_data["jp-official-gazette"]["bibliographic-data"]["parties"]["jp:applicants-agents-article"]["jp:applicants-agents"]["applicant"]["addressbook"]["name"],
+    "inventor-name": inventor_names,
+    "classification-ipc": classification_ipc,  # Set to the modified value
+    "classification-national": original_data["jp-official-gazette"]["bibliographic-data"]["classification-national"]["main-clsf"],
+    "jp:f-term": original_data["jp-official-gazette"]["bibliographic-data"]["jp:f-term-info"]["jp:f-term"],
+    "technical-field": original_data["jp-official-gazette"]["description"]["technical-field"]["p"]["#text"],
+    "background-art": original_data["jp-official-gazette"]["description"]["background-art"]["p"]["#text"],
+    "tech-problem": tech_problem,  # New field for technical problem
+    "advantageous-effects": advantageous_effects,
+    "best-mode": best_mode,
+    "claim": claims_text,
+    "abstract": original_data["jp-official-gazette"]["abstract"]["p"]["#text"]
 }
-})
 
-http://patent-service-prototype-dccsfsg5amfbcpfy.a01.azurefd.net/
+# Write filtered data to selected.json
+output_filtered_file = f'{os.path.splitext(os.path.basename(xml_file_path))[0]}_selectedVer.json'
+with open(output_filtered_file, 'w', encoding='utf-8') as output_file:
+    json.dump(filtered_data, output_file, ensure_ascii=False, indent=2)
 
-
-MainPage.vue
-<template>
-
-    <!--Header-->
-    <MenuBar />
-
-    <!--Main Layout-->
-    <v-container fluid>
-        <v-row>
-            <!--Sidebar-->
-            <v-col cols="12" md="2" class="sidebar">
-                <AppSidebar />
-            </v-col>
-
-            <!--Chat Screen-->
-            <v-col cols="12" md="4" class="chat-screen">
-                <SearchPanel @search-value-changed="handleSearchValueChanged" />
-            </v-col>
-
-            <!--Database View-->
-            <v-col cols="12" md="4" class="db-view" style="margin-left: 10px;">
-                <DatabaseView :receivedValue="searchValue" />
-            </v-col>
-        </v-row>
-    </v-container>
-
-
-</template>
-
-<script>
-import MenuBar from './MenuBar.vue';
-import AppSidebar from './AppSidebar.vue';
-import SearchPanel from './SearchPanel.vue'
-import DatabaseView from './DatabaseView.vue';
-
-export default {
-    name: 'App',
-    components: {
-        MenuBar,
-        AppSidebar,
-        SearchPanel,
-        DatabaseView,
-    },
-    data() {
-        return {
-            searchValue: ''
-        };
-    },
-    methods: {
-        handleSearchValueChanged(value) {
-            this.searchValue = value;
-        }
-    }
-};
-
-</script>
-
-<style>
-#app {
-    font-family: Avenir, Helvetica, Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-align: center;
-    color: #2c3e50;
-    margin-top: 60px;
-}
-</style>
+print(f"Filtered JSON data has been saved to {output_filtered_file}")
